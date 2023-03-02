@@ -17,6 +17,9 @@
 #include "netcdf.h"
 #include "netcdf_filter.h"
 
+#include <cuda.h>
+#include <cuda_runtime.h>
+
 /** @internal Temp name used when renaming vars to preserve varid
  * order. */
 #define NC_TEMP_NAME "_netcdf4_temporary_variable_name_for_rename"
@@ -1555,7 +1558,9 @@ NC4_put_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
     int need_to_convert = 0;
     int zero_count = 0; /* true if a count is zero */
     size_t len = 1;
+    void *cuda_buff = NULL;
 
+    
     /* Find info for this file, group, and var. */
     if ((retval = nc4_hdf5_find_grp_h5_var(ncid, varid, &h5, &grp, &var)))
         return retval;
@@ -1791,9 +1796,27 @@ NC4_put_vars(int ncid, int varid, const size_t *startp, const size_t *countp,
     /* Write the data. At last! */
     LOG((4, "about to H5Dwrite datasetid 0x%x mem_spaceid 0x%x "
          "file_spaceid 0x%x", hdf5_var->hdf_datasetid, mem_spaceid, file_spaceid));
+    int varsize=1;
+    int vartypesize;
+    for(d2=0; d2<var->ndims; d2++)
+      varsize *= count[d2];
+    if(mem_nc_type == NC_FLOAT || mem_nc_type == NC_INT)
+      vartypesize = sizeof(float);
+    else if(mem_nc_type == NC_DOUBLE)
+      vartypesize = sizeof(double);
+    else if(mem_nc_type == NC_CHAR)
+      vartypesize = sizeof(char);
+    else{
+      printf("need to handle type %d\n",mem_nc_type);
+      BAIL(-1);
+    }
+       cudaMalloc((void **)&cuda_buff, varsize*vartypesize);
+    cudaMemcpy(cuda_buff, bufr, varsize*vartypesize, cudaMemcpyHostToDevice);
+
     if (H5Dwrite(hdf5_var->hdf_datasetid,
                  ((NC_HDF5_TYPE_INFO_T *)var->type_info->format_type_info)->hdf_typeid,
-                 mem_spaceid, file_spaceid, xfer_plistid, bufr) < 0)
+		 //                 mem_spaceid, file_spaceid, xfer_plistid, bufr) < 0)
+                       mem_spaceid, file_spaceid, xfer_plistid, cuda_buff) < 0)
         BAIL(NC_EHDFERR);
 
     /* Remember that we have written to this var so that Fill Value
@@ -1818,6 +1841,9 @@ exit:
         BAIL2(NC_EPARINIT);
     if (need_to_convert && bufr) free(bufr);
 
+    if(cuda_buff)
+      cudaFree(cuda_buff);
+    
     /* If there was an error return it, otherwise return any potential
        range error value. If none, return NC_NOERR as usual.*/
     if (retval)

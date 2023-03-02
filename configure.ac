@@ -1508,7 +1508,7 @@ if test "x$enable_hdf5" = xyes; then
    # H5Pset_fapl_mpiposix and H5Pget_fapl_mpiposix have been removed since HDF5 1.8.12.
    # Use H5Pset_fapl_mpio and H5Pget_fapl_mpio, instead.
 
-   AC_CHECK_FUNCS([H5Pget_fapl_mpio H5Pset_deflate H5Z_SZIP H5Pset_all_coll_metadata_ops H5Literate])
+   AC_CHECK_FUNCS([H5Pget_fapl_mpio H5Pset_deflate H5Z_SZIP H5Pset_all_coll_metadata_ops H5Literate1])
 
    # Check to see if HDF5 library has collective metadata APIs, (HDF5 >= 1.10.0)
    if test "x$ac_cv_func_H5Pset_all_coll_metadata_ops" = xyes; then

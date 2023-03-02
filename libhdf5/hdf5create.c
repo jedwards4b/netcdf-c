@@ -19,7 +19,7 @@ static const int ILLEGAL_CREATE_FLAGS = (NC_NOWRITE|NC_MMAP|NC_64BIT_OFFSET|NC_C
 
 /* From nc4mem.c */
 extern int NC4_create_image_file(NC_FILE_INFO_T* h5, size_t);
-
+void register_nvcomp_filter();
 /**
  * @internal Create a netCDF-4/HDF5 file.
  *
@@ -207,7 +207,7 @@ nc4_create_file(const char *path, int cmode, size_t initialsz,
     if (H5Pset_coll_metadata_write(fapl_id, 1) < 0)
         BAIL(NC_EHDFERR);
 #endif
-
+    
     if (cmode & NC_NODIMSCALE_ATTACH) {
       /* See https://github.com/Unidata/netcdf-c/issues/2128 */
       nc4_info->no_dimscale_attach = NC_TRUE;
@@ -238,7 +238,19 @@ nc4_create_file(const char *path, int cmode, size_t initialsz,
         }
         else /* Normal file */
         {
-            /* Create the HDF5 file. */
+	  printf("Call register filter\n");
+	  register_nvcomp_filter();
+	  printf("register filter done\n");
+	  //#ifdef USE_HDF5_GDS
+	    if (H5Pset_driver_by_name(fapl_id, "gds", NULL) < 0)
+	      BAIL(NC_EHDFERR);
+	    //#endif
+	    // I didn't see any noticable effect in adding this set_cache call
+            if(H5Pset_cache(fapl_id, 0, 0, 0, 0.0) < 0)
+	      BAIL(NC_EHDFERR);
+	    if(H5Pset_alignment(fapl_id, 0, 4096) < 0)
+	      BAIL(NC_EHDFERR);
+	    /* Create the HDF5 file. */
             if ((hdf5_info->hdfid = nc4_H5Fcreate(path, flags, fcpl_id, fapl_id)) < 0)
                 BAIL(EACCES);
         }
